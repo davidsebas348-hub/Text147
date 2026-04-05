@@ -1,46 +1,40 @@
 -- ======================
--- X-RAY SIN AFECTAR GUN/COINS/JUGADORES
--- Toggle por ejecución
+-- X-RAY CONFIGURABLE
+-- SIN GUN / COINS / PLAYERS
 -- ======================
 
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 
--- Toggle global
-if _G.XRayActive == nil then
-    _G.XRayActive = false
+-- CONFIG
+getgenv().XRAY_TRANSPARENCY = getgenv().XRAY_TRANSPARENCY or 0.5
+getgenv().XRAY_ENABLED = not (getgenv().XRAY_ENABLED or false)
+
+-- Si ya existe loop anterior, apagarlo
+if getgenv().XRAY_CONNECTION then
+    getgenv().XRAY_CONNECTION = false
 end
 
--- Si ya estaba activo, desactivar y restaurar
-if _G.XRayActive then
-    _G.XRayActive = false
-
-    -- Restaurar todas las transparencias
-    if _G._XRayOriginalTransparency then
-        for obj, trans in pairs(_G._XRayOriginalTransparency) do
+-- Desactivar y restaurar
+if not getgenv().XRAY_ENABLED then
+    if getgenv().XRAY_ORIGINAL then
+        for obj, trans in pairs(getgenv().XRAY_ORIGINAL) do
             if obj and obj:IsA("BasePart") then
                 obj.LocalTransparencyModifier = trans
             end
         end
-        _G._XRayOriginalTransparency = nil
     end
 
-    print("❌ X-RAY desactivado")
+    getgenv().XRAY_ORIGINAL = {}
     return
 end
 
--- Activar X-RAY
-_G.XRayActive = true
-print("✅ X-RAY activado")
-
--- Nombres que ignoraremos
 local ignoreNames = {"GunDrop"}
 local ignoreContains = {"coin"}
 
--- Guardar transparencias originales
-_G._XRayOriginalTransparency = {}
+getgenv().XRAY_ORIGINAL = getgenv().XRAY_ORIGINAL or {}
+getgenv().XRAY_CONNECTION = true
 
--- Función para saber si ignorar
 local function shouldIgnore(obj)
     for _, player in ipairs(Players:GetPlayers()) do
         if player.Character and obj:IsDescendantOf(player.Character) then
@@ -49,33 +43,42 @@ local function shouldIgnore(obj)
     end
 
     for _, name in ipairs(ignoreNames) do
-        if obj.Name == name then return true end
+        if obj.Name == name then
+            return true
+        end
     end
 
+    local lowerName = obj.Name:lower()
     for _, str in ipairs(ignoreContains) do
-        if obj.Name:lower():find(str) then return true end
+        if lowerName:find(str) then
+            return true
+        end
     end
 
     return false
 end
 
--- Función aplicar X-RAY
 local function applyXRay(obj)
-    if not obj:IsA("BasePart") then return end
-    if shouldIgnore(obj) then return end
-
-    if not _G._XRayOriginalTransparency[obj] then
-        _G._XRayOriginalTransparency[obj] = obj.LocalTransparencyModifier or 0
+    if not obj:IsA("BasePart") then
+        return
     end
-    obj.LocalTransparencyModifier = 0.5
+
+    if shouldIgnore(obj) then
+        return
+    end
+
+    if getgenv().XRAY_ORIGINAL[obj] == nil then
+        getgenv().XRAY_ORIGINAL[obj] = obj.LocalTransparencyModifier
+    end
+
+    obj.LocalTransparencyModifier = getgenv().XRAY_TRANSPARENCY
 end
 
--- Loop principal
 task.spawn(function()
-    while _G.XRayActive do
+    while getgenv().XRAY_ENABLED and getgenv().XRAY_CONNECTION do
         for _, obj in ipairs(Workspace:GetDescendants()) do
             applyXRay(obj)
         end
-        task.wait(2.5)
+        task.wait(1)
     end
 end)
